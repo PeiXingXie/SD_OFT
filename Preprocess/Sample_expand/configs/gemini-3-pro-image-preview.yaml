@@ -1,0 +1,20 @@
+provider: andes_gateway
+
+base_url: "${ENV:ANDES_BASE_URL}"
+endpoint_path: "/image/v1/generations"
+
+auth:
+  app_id: "${ENV:ANDES_APP_ID}"
+  secret_key: "${ENV:ANDES_SECRET_KEY}"
+
+request_defaults:
+  model: "gemini-3-pro-image-preview"
+  size: "1024x1024"
+  num: 1
+
+retry:
+  timeout_sec: 300
+  max_retries: 3
+  retry_delay_sec: 3.0
+  rate_limit_delay_sec: 10.0
+

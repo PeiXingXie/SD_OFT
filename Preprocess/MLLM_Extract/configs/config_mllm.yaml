@@ -1,0 +1,84 @@
+# """
+# MLLM extraction default config.
+# - input: dir mode (scan images) or csv mode (read paths from CSV)
+# - prompt: uses Andes-gateway style multimodal messages (images on user message)
+# - output_csv: used for resume (if exists, will skip rows with caption filled)
+# """
+
+input:
+  mode: "dir"              # "dir" | "csv"
+  image_dir: "/ABS/PATH/TO/IMAGE_DIR"
+  recursive: true
+  glob: "*.*"              # will be filtered by extensions below
+  exts: [".jpg",".jpeg",".png",".webp",".gif"]
+
+  # csv mode
+  input_csv: "/ABS/PATH/TO/input.csv"
+  image_path_column: "path"
+  sample_id_column: ""     # empty: derive from filename
+
+run:
+  start: 0
+  end: null                # null means no upper bound
+  read_images: true
+  image_detail: "auto"     # "low" | "high" | "auto"
+  write_every_n: 20
+  # Andes 网关常见不可重试 code（例如内容安全拦截 -30002）
+  non_retriable_api_codes: [-30002]
+
+# prompt:
+#   system_prompt: |
+#     You are an image captioning assistant for building a fine-tuning dataset for text-to-image generation.
+
+#     For each input image, produce exactly one short English caption suitable for training.
+
+#     Your goal is to describe the dominant visual content of the image in a concise, medium-grained way.
+
+#     Instructions:
+#     - if the image has a clear main subject, describe that subject and its setting
+#     - if the image does not have a clear single subject, describe the overall scene, place, landscape, or shared activity
+#     - include only a few salient visible attributes
+#     - do not list every object, person, or background detail
+#     - prefer the most globally representative description of the image
+#     - if people are small or secondary, mention them briefly or omit them
+#     - use a concise caption style suitable for text-to-image training
+#     - do not mention artistic technique, brushwork, dots, texture, palette, composition, artist names, dates, signatures, watermarks, or image quality
+#     - do not use subjective, emotional, or evaluative language
+#     - output exactly one line
+#     - always end with the exact suffix: ", pointillism painting"
+
+#     Preferred patterns:
+#     - "a/an [main subject] [salient attributes] [scene/context], pointillism painting"
+#     - "a [scene/setting] with [salient elements], pointillism painting"
+#     - "[landscape/place] with [salient elements], pointillism painting"
+
+#     Output only the caption.
+
+#   user_prompt: |
+#     Generate one caption for this image in the required format.
+#     If there is no clear single subject, describe the overall scene instead.
+#     Output only the caption.
+
+api:
+  # Andes gateway endpoint example:
+  #   https://YOUR_GATEWAY_HOST/chat/v1/completions
+  base_url: ""
+  app_id: ""
+  secret_key: ""
+  model: "gpt-5"
+  timeout_sec: 120
+  retry_on_code: -20001
+  retry_sleep_sec: 60
+  # Optional
+  # useReasoning: false
+  # temperature: 0.2
+  # topP: 0.9
+
+output:
+  output_csv: "outputs/captions.csv"
+  output_jsonl: "outputs/captions.jsonl"   # empty means disable
+  caption_column: "caption"
+  raw_response_column: "__raw_response"
+  error_column: "__error"
+  include_raw_in_jsonl: true
+

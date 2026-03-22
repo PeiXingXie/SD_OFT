@@ -1,0 +1,24 @@
+provider: andes_gateway
+
+# Base host for Andes gateway. The code will enforce suffix "/image/v1/generations".
+base_url: "${ENV:ANDES_BASE_URL}"
+endpoint_path: "/image/v1/generations"
+
+auth:
+  app_id: "${ENV:ANDES_APP_ID}"
+  secret_key: "${ENV:ANDES_SECRET_KEY}"
+
+request_defaults:
+  model: "gpt-image-1"
+  # NOTE: size is enforced to 1024x1024 in code, config is just for readability.
+  size: "1024x1024"
+  num: 1
+  # requirement: gpt-image-1 must use quality=high
+  quality: "high"
+
+retry:
+  timeout_sec: 300
+  max_retries: 3
+  retry_delay_sec: 3.0
+  rate_limit_delay_sec: 10.0
+

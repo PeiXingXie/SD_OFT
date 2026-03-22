@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Validation 对比查看器（baseline + steps）</title>
+  <style>
+    :root{
+      --bg:#0b1116;
+      --card:#111a22;
+      --muted:#8aa0b2;
+      --text:#e8f0f6;
+      --accent:#4aa3ff;
+      --border:#1e2a35;
+      --warn:#ffb020;
+      --err:#ff6b6b;
+      --ok:#22c55e;
+      --chip:#0e1820;
+      --kv-bg:#0d1720;
+      --imgSize: 220px;
+      --fit: contain;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:linear-gradient(180deg, #0b1116, #0a121a);
+      color:var(--text);
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      background:rgba(11,17,22,.86);
+      backdrop-filter:saturate(140%) blur(8px);
+      border-bottom:1px solid var(--border);
+    }
+    .container{max-width:1500px; margin:0 auto; padding:16px;}
+    h1{font-size:18px; margin:0}
+    main{padding:16px}
+
+    .settings-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
+    .settings-toggle{
+      background:transparent; border:1px solid var(--border); color:var(--text);
+      padding:6px 10px; border-radius:10px; cursor:pointer; font-weight:600;
+    }
+    .settings-body.hidden{ display:none; }
+
+    .controls{display:flex; flex-wrap:wrap; gap:12px; align-items:center;}
+    .control{
+      background:var(--card); border:1px solid var(--border); border-radius:10px;
+      padding:10px 12px; display:flex; gap:10px; align-items:center;
+    }
+    input[type="text"], input[type="number"], select{
+      color:var(--text); background:transparent; border:none; outline:none; max-width:100%;
+    }
+    input[type="range"]{ width: 180px; }
+    .btn{
+      background:var(--accent); color:#001325; border:none;
+      padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700;
+    }
+    .btn:disabled{opacity:.5; cursor:not-allowed}
+    .hint{color:var(--muted); font-size:12px}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;}
+    .small{font-size:12px}
+    .empty{color:var(--muted); text-align:center; padding:40px 0}
+    a{ color: var(--accent); text-decoration:none; }
+
+    .toolbar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    .search{
+      flex:1; min-width:220px; display:flex; gap:8px; align-items:center;
+      background:#0e1820; border:1px solid var(--border); border-radius:10px; padding:8px 10px;
+    }
+    .search input{ flex:1; border:none; outline:none; background:transparent; color:var(--text); }
+
+    .filters{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    .chip{
+      display:inline-flex; align-items:center; gap:6px;
+      padding:4px 8px; border-radius:999px;
+      border:1px solid var(--border); background:var(--chip);
+      cursor:pointer; user-select:none; font-size:12px;
+    }
+    .chip input{accent-color:var(--accent); cursor:pointer;}
+    .badge{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; border:1px solid var(--border); color:#a9c6db; background:#0a131a; }
+    .ok{color:var(--ok)} .err{color:var(--err)} .warn{color:var(--warn)}
+
+    .gallery{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      margin-top: 12px;
+    }
+    .compare-row{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .compare-row-head{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      padding:10px 10px 0;
+    }
+    .compare-sample{
+      flex: 0 0 360px;
+      min-width: 220px;
+      max-width: 520px;
+      word-break:break-word;
+      white-space:pre-wrap;
+      color:#cfe7ff;
+    }
+    .compare-strip{
+      flex: 1 1 auto;
+      display:flex;
+      gap:10px;
+      overflow-x:auto;
+      padding-bottom:10px;
+    }
+    .compare-cell{
+      flex: 0 0 auto;
+      width: calc(var(--imgSize) + 28px);
+      border:1px solid var(--border);
+      border-radius:12px;
+      overflow:hidden;
+      background:#0c151c;
+    }
+    .compare-step{
+      padding:6px 10px;
+      font-size:12px;
+      color:var(--muted);
+      border-bottom:1px solid var(--border);
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:center;
+    }
+    .compare-step .badge{
+      padding:1px 8px;
+      font-size:12px;
+      border-radius:999px;
+    }
+    .compare-cell .imgbox{
+      height: var(--imgSize);
+      border-bottom:none;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      min-width: 0;
+    }
+    .imgbox{
+      background:#0c151c;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height: var(--imgSize);
+      overflow:hidden;
+    }
+    .imgbox img{
+      width: 100%;
+      height: 100%;
+      object-fit: var(--fit);
+      display:block;
+    }
+    .card-body{
+      padding:10px 10px 12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      min-width:0;
+    }
+    .caption{
+      font-size:12px;
+      line-height:1.55;
+      color:#d6e4f0;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .meta-line{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .meta-line .mono{ color:#cfe7ff; }
+
+    .pager-float{
+      position:fixed; right:14px; bottom:14px; z-index:20;
+      background:rgba(15,23,32,.92); backdrop-filter: blur(6px) saturate(140%);
+      border:1px solid var(--border); border-radius:12px; padding:10px; min-width:260px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+    .pager-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .pager-row .btn{ padding:8px 10px; }
+    .pager-row select, .pager-row input[type="number"]{
+      background:#0e1820; border:1px solid var(--border); border-radius:8px; color:var(--text);
+      padding:6px 8px; width:auto; min-width:86px;
+    }
+    .pager-info{ color:var(--muted); font-size:12px; margin-top:6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="settings-head">
+        <h1>Validation 对比：同一 sample 在 baseline + 不同 step 的结果（支持 搜索 / 分页 / 尺寸）</h1>
+        <button id="settingsToggleBtn" class="settings-toggle" type="button">收起设置 ▾</button>
+      </div>
+
+      <div id="settingsBody" class="settings-body">
+        <div class="controls">
+          <label class="control" style="flex:1 1 520px">
+            <span>图片目录（路径）</span>
+            <input id="dirPathInput" type="text" class="mono" placeholder="_OFT/outputs/.../validation" />
+          </label>
+          <button id="loadBtn" class="btn" type="button">加载</button>
+          <span id="status" class="hint">通过同源 API 读取：`/api/ls?path=...`（列目录）与 `/api/bin?path=...`（图片）。</span>
+        </div>
+
+        <div class="controls" style="margin-top:10px;">
+          <label class="control">
+            <span class="small muted">递归子目录</span>
+            <input id="recursiveInput" type="checkbox" />
+          </label>
+          <div class="control">
+            <span>label</span>
+            <select id="labelModeSelect" class="mono">
+              <option value="none">无</option>
+              <option value="firstDir" selected>第1级子目录</option>
+              <option value="relDir">相对目录（全路径）</option>
+            </select>
+          </div>
+          <div class="control">
+            <span>caption</span>
+            <select id="captionModeSelect" class="mono">
+              <option value="filename" selected>文件名</option>
+              <option value="relPath">相对路径</option>
+              <option value="absPath">绝对路径</option>
+            </select>
+          </div>
+          <label class="control">
+            <span>最多</span>
+            <input id="limitInput" type="number" min="1" step="1" style="width:120px;" />
+            <span class="small muted">张</span>
+          </label>
+        </div>
+
+        <div class="toolbar">
+          <div class="search">
+            <span class="small muted">搜索（caption/元信息）：</span>
+            <input id="queryInput" placeholder="例如：bird / vermeer / train（空=不过滤）" />
+          </div>
+          <div class="control">
+            <span>每页</span>
+            <select id="pageSizeSelect">
+              <option value="6">6</option>
+              <option value="8">8</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="60" selected>60</option>
+              <option value="120">120</option>
+              <option value="240">240</option>
+              <option value="600">600</option>
+            </select>
+          </div>
+          <div class="control">
+            <span>尺寸</span>
+            <input id="imgSizeRange" type="range" min="80" max="560" step="10" />
+            <input id="imgSizeNumber" type="number" min="80" max="560" step="10" style="width:86px;" />
+            <span class="small muted">px</span>
+          </div>
+          <div class="control">
+            <span>适配</span>
+            <select id="fitSelect">
+              <option value="contain" selected>contain（完整显示）</option>
+              <option value="cover">cover（铺满裁剪）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="filters" id="labelFilters">
+          <div class="hint">label 筛选：</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="gallery" class="gallery"></div>
+    <div id="empty" class="empty">暂无数据</div>
+  </main>
+
+  <div class="pager-float" id="pagerBox" hidden>
+    <div class="pager-row">
+      <button id="prevBtn" class="btn" type="button">上一页</button>
+      <button id="nextBtn" class="btn" type="button">下一页</button>
+      <label style="display:inline-flex; align-items:center; gap:6px;">
+        <span class="small muted">跳转</span>
+        <input id="jumpInput" type="number" min="1" step="1" value="1" />
+      </label>
+      <label style="display:inline-flex; align-items:center; gap:6px;">
+        <span class="small muted">每页</span>
+        <select id="pageSizeSelectFloat">
+          <option value="6">6</option>
+          <option value="8">8</option>
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="60" selected>60</option>
+          <option value="120">120</option>
+          <option value="240">240</option>
+          <option value="600">600</option>
+        </select>
+      </label>
+    </div>
+    <div class="pager-info" id="pagerInfo">第 1/1 页 · 共 0 条</div>
+  </div>
+
+<script>
+const STORAGE_KEYS = {
+  dirPath: 'dirGalleryViewer:dirPath',
+  collapseSettings: 'csvGalleryViewer:collapseSettings',
+  recursive: 'dirGalleryViewer:recursive',
+  labelMode: 'dirGalleryViewer:labelMode',
+  captionMode: 'dirGalleryViewer:captionMode',
+  limit: 'dirGalleryViewer:limit',
+  selectedLabels: 'csvGalleryViewer:selectedLabels',
+  pageSize: 'csvGalleryViewer:pageSize',
+  query: 'csvGalleryViewer:query',
+  imgSize: 'csvGalleryViewer:imgSize',
+  fit: 'csvGalleryViewer:fit',
+};
+
+const DEFAULTS = {
+  dirPath: '_OFT/outputs/your_run/validation',
+  recursive: true, // 对比模式必须递归
+  labelMode: 'firstDir', // none | firstDir | relDir
+  captionMode: 'filename', // filename | relPath | absPath
+  limit: 20000,
+  imageCol: 'path',
+  captionCol: 'caption',
+  labelCol: 'label',
+  selectedLabels: [],
+  pageSize: 60,
+  query: '',
+  imgSize: 220,
+  fit: 'contain',
+};
+
+const IMAGE_EXT_LIST = ['jpg','jpeg','png','webp','bmp','gif','tif','tiff','heic','heif'];
+const KNOWN_IMAGE_EXTENSIONS = new Set(IMAGE_EXT_LIST);
+
+const state = {
+  header: [],
+  rows: [],
+  filteredRows: [],
+  stepOrder: [], // ['baseline', 'step_000200', ...]
+  page: 1,
+  pageSize: DEFAULTS.pageSize,
+  dirPath: DEFAULTS.dirPath,
+  recursive: DEFAULTS.recursive,
+  labelMode: DEFAULTS.labelMode,
+  captionMode: DEFAULTS.captionMode,
+  limit: DEFAULTS.limit,
+  imageCol: DEFAULTS.imageCol,
+  captionCol: DEFAULTS.captionCol,
+  labelCol: DEFAULTS.labelCol,
+  selectedLabels: new Set(DEFAULTS.selectedLabels || []),
+  labelStats: new Map(), // label -> count
+  query: DEFAULTS.query,
+  imgSize: DEFAULTS.imgSize,
+  fit: DEFAULTS.fit,
+  ui: { collapseSettings: false },
+  _searchCacheVersion: 0,
+};
+
+const els = {
+  settingsBody: document.getElementById('settingsBody'),
+  settingsToggleBtn: document.getElementById('settingsToggleBtn'),
+  dirPathInput: document.getElementById('dirPathInput'),
+  loadBtn: document.getElementById('loadBtn'),
+  status: document.getElementById('status'),
+  recursiveInput: document.getElementById('recursiveInput'),
+  labelModeSelect: document.getElementById('labelModeSelect'),
+  captionModeSelect: document.getElementById('captionModeSelect'),
+  limitInput: document.getElementById('limitInput'),
+  queryInput: document.getElementById('queryInput'),
+  pageSizeSelect: document.getElementById('pageSizeSelect'),
+  pageSizeSelectFloat: document.getElementById('pageSizeSelectFloat'),
+  imgSizeRange: document.getElementById('imgSizeRange'),
+  imgSizeNumber: document.getElementById('imgSizeNumber'),
+  fitSelect: document.getElementById('fitSelect'),
+  labelFilters: document.getElementById('labelFilters'),
+  gallery: document.getElementById('gallery'),
+  empty: document.getElementById('empty'),
+  pagerBox: document.getElementById('pagerBox'),
+  prevBtn: document.getElementById('prevBtn'),
+  nextBtn: document.getElementById('nextBtn'),
+  jumpInput: document.getElementById('jumpInput'),
+  pagerInfo: document.getElementById('pagerInfo'),
+};
+
+init();
+
+function init(){
+  loadStoredSettings();
+  syncInputsFromState();
+  applySettingsCollapseUI();
+  applyImageSizeToCss();
+  applyFitToCss();
+
+  // 对比模式：强制递归；忽略 label/caption 模式；隐藏 label 筛选区
+  try{
+    els.recursiveInput.checked = true;
+    els.recursiveInput.disabled = true;
+    els.labelModeSelect.disabled = true;
+    els.captionModeSelect.disabled = true;
+    els.labelFilters.style.display = 'none';
+  }catch{}
+
+  els.loadBtn.addEventListener('click', loadFromInputs);
+  els.settingsToggleBtn.addEventListener('click', ()=>{
+    state.ui.collapseSettings = !state.ui.collapseSettings;
+    applySettingsCollapseUI();
+    persistSettings();
+  });
+
+  els.recursiveInput.addEventListener('change', ()=>{
+    state.recursive = !!els.recursiveInput.checked;
+    persistSettings();
+  });
+  els.labelModeSelect.addEventListener('change', ()=>{
+    state.labelMode = String(els.labelModeSelect.value || DEFAULTS.labelMode);
+    persistSettings();
+  });
+  els.captionModeSelect.addEventListener('change', ()=>{
+    state.captionMode = String(els.captionModeSelect.value || DEFAULTS.captionMode);
+    persistSettings();
+  });
+  els.limitInput.addEventListener('change', ()=>{
+    const n = parseInt(els.limitInput.value || String(DEFAULTS.limit), 10);
+    state.limit = clampInt(n, 1, 200000, DEFAULTS.limit);
+    els.limitInput.value = String(state.limit);
+    persistSettings();
+  });
+
+  const onQueryInput = debounce(()=>{
+    state.query = (els.queryInput.value || '').trim();
+    persistSettings();
+    applyFilterAndRender(true);
+  }, 120);
+  els.queryInput.addEventListener('input', onQueryInput);
+
+  els.pageSizeSelect.addEventListener('change', (e)=>setPageSize(parseInt(e.target.value||DEFAULTS.pageSize, 10)));
+  els.pageSizeSelectFloat.addEventListener('change', (e)=>setPageSize(parseInt(e.target.value||DEFAULTS.pageSize, 10)));
+  els.prevBtn.addEventListener('click', ()=>gotoPage(state.page - 1));
+  els.nextBtn.addEventListener('click', ()=>gotoPage(state.page + 1));
+  els.jumpInput.addEventListener('change', ()=>{
+    const p = parseInt(els.jumpInput.value||'1', 10);
+    gotoPage(p);
+  });
+
+  els.imgSizeRange.addEventListener('input', ()=>{
+    const n = parseInt(els.imgSizeRange.value||String(DEFAULTS.imgSize), 10);
+    setImgSize(n, false);
+  });
+  els.imgSizeRange.addEventListener('change', ()=>{
+    const n = parseInt(els.imgSizeRange.value||String(DEFAULTS.imgSize), 10);
+    setImgSize(n, true);
+  });
+  els.imgSizeNumber.addEventListener('change', ()=>{
+    const n = parseInt(els.imgSizeNumber.value||String(DEFAULTS.imgSize), 10);
+    setImgSize(n, true);
+  });
+  els.fitSelect.addEventListener('change', ()=>{
+    state.fit = String(els.fitSelect.value || DEFAULTS.fit);
+    applyFitToCss();
+    persistSettings();
+  });
+
+  // 自动加载
+  loadFromInputs().catch(()=>{});
+}
+
+function setStatus(msg, cls=''){
+  els.status.textContent = msg;
+  els.status.className = 'hint ' + cls;
+}
+
+function applySettingsCollapseUI(){
+  const collapsed = !!state.ui.collapseSettings;
+  if (collapsed){
+    els.settingsBody.classList.add('hidden');
+    els.settingsToggleBtn.textContent = '展开设置 ▸';
+  } else {
+    els.settingsBody.classList.remove('hidden');
+    els.settingsToggleBtn.textContent = '收起设置 ▾';
+  }
+}
+
+function applyImageSizeToCss(){
+  const n = clampInt(state.imgSize, 80, 560, DEFAULTS.imgSize);
+  document.documentElement.style.setProperty('--imgSize', `${n}px`);
+}
+function applyFitToCss(){
+  const v = (state.fit === 'cover') ? 'cover' : 'contain';
+  document.documentElement.style.setProperty('--fit', v);
+}
+
+function setImgSize(n, shouldPersist){
+  state.imgSize = clampInt(n, 80, 560, DEFAULTS.imgSize);
+  els.imgSizeRange.value = String(state.imgSize);
+  els.imgSizeNumber.value = String(state.imgSize);
+  applyImageSizeToCss();
+  if (shouldPersist) persistSettings();
+}
+
+function clampInt(n, min, max, fallback){
+  n = parseInt(n, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function persistSettings(){
+  if (typeof localStorage === 'undefined') return;
+  try{
+    localStorage.setItem(STORAGE_KEYS.dirPath, state.dirPath || '');
+    localStorage.setItem(STORAGE_KEYS.collapseSettings, state.ui.collapseSettings ? '1' : '0');
+    localStorage.setItem(STORAGE_KEYS.recursive, state.recursive ? '1' : '0');
+    localStorage.setItem(STORAGE_KEYS.labelMode, state.labelMode || DEFAULTS.labelMode);
+    localStorage.setItem(STORAGE_KEYS.captionMode, state.captionMode || DEFAULTS.captionMode);
+    localStorage.setItem(STORAGE_KEYS.limit, String(state.limit || DEFAULTS.limit));
+    localStorage.setItem(STORAGE_KEYS.selectedLabels, JSON.stringify(Array.from(state.selectedLabels || [])));
+    localStorage.setItem(STORAGE_KEYS.pageSize, String(state.pageSize || DEFAULTS.pageSize));
+    localStorage.setItem(STORAGE_KEYS.query, state.query || '');
+    localStorage.setItem(STORAGE_KEYS.imgSize, String(state.imgSize || DEFAULTS.imgSize));
+    localStorage.setItem(STORAGE_KEYS.fit, state.fit || DEFAULTS.fit);
+  }catch{}
+}
+
+function loadStoredSettings(){
+  if (typeof localStorage === 'undefined') return;
+  try{
+    // 新 key（dirPath），同时兼容旧 key（csvPath）
+    const dirPath = localStorage.getItem(STORAGE_KEYS.dirPath);
+    if (dirPath) state.dirPath = dirPath;
+    if (!state.dirPath){
+      const legacyCsvPath = localStorage.getItem('csvGalleryViewer:csvPath');
+      if (legacyCsvPath) state.dirPath = legacyCsvPath;
+    }
+    const cs = localStorage.getItem(STORAGE_KEYS.collapseSettings);
+    if (cs != null) state.ui.collapseSettings = cs === '1';
+    const rec = localStorage.getItem(STORAGE_KEYS.recursive);
+    if (rec != null) state.recursive = rec === '1';
+    const lm = localStorage.getItem(STORAGE_KEYS.labelMode);
+    if (lm != null) state.labelMode = String(lm || DEFAULTS.labelMode);
+    const cm = localStorage.getItem(STORAGE_KEYS.captionMode);
+    if (cm != null) state.captionMode = String(cm || DEFAULTS.captionMode);
+    const lim = localStorage.getItem(STORAGE_KEYS.limit);
+    if (lim != null && !Number.isNaN(parseInt(lim,10))) state.limit = parseInt(lim, 10);
+    const sl = localStorage.getItem(STORAGE_KEYS.selectedLabels);
+    if (sl){
+      try{
+        const arr = JSON.parse(sl);
+        if (Array.isArray(arr)) state.selectedLabels = new Set(arr.map(x=>String(x)));
+      }catch{}
+    }
+    const ps = localStorage.getItem(STORAGE_KEYS.pageSize);
+    if (ps != null && !Number.isNaN(parseInt(ps,10))) state.pageSize = parseInt(ps, 10);
+    const q = localStorage.getItem(STORAGE_KEYS.query);
+    if (q != null) state.query = String(q || '');
+    const isz = localStorage.getItem(STORAGE_KEYS.imgSize);
+    if (isz != null && !Number.isNaN(parseInt(isz,10))) state.imgSize = parseInt(isz, 10);
+    const fit = localStorage.getItem(STORAGE_KEYS.fit);
+    if (fit != null) state.fit = String(fit || DEFAULTS.fit);
+  }catch{}
+}
+
+function syncInputsFromState(){
+  els.dirPathInput.value = state.dirPath || '';
+  els.recursiveInput.checked = !!state.recursive;
+  setSelectValue(els.labelModeSelect, state.labelMode || DEFAULTS.labelMode);
+  setSelectValue(els.captionModeSelect, state.captionMode || DEFAULTS.captionMode);
+  els.limitInput.value = String(clampInt(state.limit, 1, 200000, DEFAULTS.limit));
+  els.queryInput.value = state.query || '';
+  setSelectValue(els.pageSizeSelect, state.pageSize);
+  setSelectValue(els.pageSizeSelectFloat, state.pageSize);
+  setImgSize(state.imgSize, false);
+  setSelectValue(els.fitSelect, state.fit || DEFAULTS.fit);
+}
+
+function setSelectValue(select, value){
+  if (!select) return;
+  const str = String(value);
+  let option = Array.from(select.options).find(opt=>opt.value === str);
+  if (!option){
+    option = document.createElement('option');
+    option.value = str; option.textContent = str;
+    select.appendChild(option);
+  }
+  select.value = str;
+}
+
+function dirnameOfAbsPath(absPath){
+  const p = String(absPath || '').trim();
+  if (!p || !p.includes('/')) return '';
+  const idx = p.lastIndexOf('/');
+  if (idx <= 0) return '/';
+  return p.slice(0, idx);
+}
+
+function joinPosix(baseDir, relPath){
+  const base = String(baseDir || '').trim();
+  let rel = String(relPath || '').trim();
+  if (!base || !rel) return '';
+  rel = rel.replace(/^\.\/+/, '');
+  const combined = (base.endsWith('/') ? base : base + '/') + rel;
+  const parts = combined.split('/');
+  const stack = [];
+  for (const part of parts){
+    if (part === '' || part === '.') continue;
+    if (part === '..'){ if (stack.length) stack.pop(); continue; }
+    stack.push(part);
+  }
+  return '/' + stack.join('/');
+}
+
+function normalizePath(p){
+  let path = String(p || '').trim();
+  if (!path) return '';
+  if ((path.startsWith('"') && path.endsWith('"')) || (path.startsWith("'") && path.endsWith("'"))) {
+    path = path.slice(1, -1).trim();
+  }
+  if (/^file:\/\//i.test(path)){
+    try{ path = path.replace(/^file:\/\//i, ''); }catch{}
+  }
+  return path;
+}
+
+function apiBinUrl(absPath){ return `/api/bin?path=${encodeURIComponent(absPath)}`; }
+function apiLsUrl(absDir, recursive, limit){
+  const r = recursive ? '1' : '0';
+  const lim = clampInt(limit, 1, 200000, DEFAULTS.limit);
+  return `/api/ls?path=${encodeURIComponent(absDir)}&recursive=${r}&limit=${encodeURIComponent(String(lim))}`;
+}
+
+function cleanColName(name){
+  let s = String(name ?? '');
+  s = s.replace(/[\uFEFF\u200B-\u200D\u2060]/g, '');
+  return s.trim();
+}
+
+function normalizeTableHeaderAndRowsInPlace(header, rows){
+  if (!Array.isArray(header) || !Array.isArray(rows)) return { mapping: new Map(), changed: false };
+  const mapping = new Map();
+  const used = new Set();
+  let changed = false;
+
+  for (let i = 0; i < header.length; i++){
+    const oldKey = String(header[i] ?? '');
+    const cleaned = cleanColName(oldKey);
+    if (!cleaned){
+      header[i] = cleaned;
+      if (oldKey !== cleaned) changed = true;
+      continue;
+    }
+    if (used.has(cleaned)){
+      const fallback = String(oldKey).trim();
+      header[i] = fallback;
+      used.add(fallback);
+      if (fallback !== oldKey) changed = true;
+      continue;
+    }
+    used.add(cleaned);
+    header[i] = cleaned;
+    if (cleaned !== oldKey){
+      mapping.set(oldKey, cleaned);
+      changed = true;
+    }
+  }
+
+  if (changed && mapping.size > 0){
+    for (const r of rows){
+      if (!r || typeof r !== 'object') continue;
+      for (const [oldKey, newKey] of mapping.entries()){
+        if (oldKey === newKey) continue;
+        if (Object.prototype.hasOwnProperty.call(r, oldKey)){
+          if (!Object.prototype.hasOwnProperty.call(r, newKey)){
+            r[newKey] = r[oldKey];
+          }
+          try{ delete r[oldKey]; }catch{}
+        }
+      }
+    }
+  }
+  return { mapping, changed };
+}
+
+function parseCSVLoose(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  const len = text.length;
+  for (let i = 0; i < len; i++) {
+    let c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        const next = text[i + 1];
+        if (next === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\r' || c === '\n') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); field = '';
+        if (row.length > 0 && (row.length > 1 || row[0].trim().length > 0)) rows.push(row);
+        row = [];
+      } else field += c;
+    }
+  }
+  row.push(field);
+  if (row.length > 0 && (row.length > 1 || row[0].trim().length > 0)) rows.push(row);
+  return rows;
+}
+
+function parseCSVWithHeader(text){
+  const rows = parseCSVLoose(text);
+  if (!rows.length) return { header: [], objects: [] };
+  const header = rows[0].map(h => (h||'').trim());
+  const data = rows.slice(1);
+  const objects = [];
+  for (const r of data){
+    if (!r || (r.length===1 && String(r[0]||'').trim()==='')) continue;
+    const obj = {};
+    for (let i = 0; i < header.length; i++){
+      const k = header[i];
+      if (!k) continue;
+      obj[k] = r[i] == null ? '' : String(r[i]);
+    }
+    objects.push(obj);
+  }
+  return { header, objects };
+}
+
+function detectBestColumn(header, preferredLowerList){
+  const lower = header.map(h=>String(h||''));
+  for (const p of preferredLowerList){
+    const idx = lower.findIndex(x=>x.toLowerCase() === p);
+    if (idx >= 0) return header[idx];
+  }
+  return '';
+}
+
+function isImageLikePath(value){
+  const s = String(value || '').trim();
+  if (!s) return false;
+  if (/^https?:\/\//i.test(s)) {
+    const u = s.split('?')[0].split('#')[0];
+    const ext = u.slice(u.lastIndexOf('.') + 1).toLowerCase();
+    return KNOWN_IMAGE_EXTENSIONS.has(ext);
+  }
+  const cleaned = s.split('?')[0].split('#')[0];
+  const lastDot = cleaned.lastIndexOf('.');
+  if (lastDot === -1) return false;
+  const ext = cleaned.slice(lastDot + 1).toLowerCase();
+  return KNOWN_IMAGE_EXTENSIONS.has(ext);
+}
+
+function ensureColumnSelections(){
+  const header = state.header || [];
+  if (!header.length) return;
+
+  // image
+  if (!header.includes(state.imageCol)){
+    const best = detectBestColumn(header, ['file_name','image_path','img_path','image','img','path','file','filename','filepath']);
+    state.imageCol = best || header[0];
+  }
+  // caption
+  if (!header.includes(state.captionCol)){
+    const best = detectBestColumn(header, ['description','caption','text','prompt','title']);
+    state.captionCol = best || (header[1] || header[0]);
+  }
+  // label
+  if (!header.includes(state.labelCol)){
+    const best = detectBestColumn(header, ['genre','label','category','class','style','subset']);
+    state.labelCol = best || (header[2] || header[0]);
+  }
+}
+
+function renderColumnSelects(){
+  const header = state.header || [];
+  const sels = [els.imageColSelect, els.captionColSelect, els.labelColSelect];
+  for (const sel of sels){
+    sel.innerHTML = '';
+    for (const k of header){
+      if (!k) continue;
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = k;
+      sel.appendChild(opt);
+    }
+  }
+  ensureColumnSelections();
+  setSelectValue(els.imageColSelect, state.imageCol);
+  setSelectValue(els.captionColSelect, state.captionCol);
+  setSelectValue(els.labelColSelect, state.labelCol);
+}
+
+function getEffectiveImageRoot(){
+  // 目录模式下，默认直接使用 dirPath 作为根目录（主要用于相对路径兜底）
+  return String(state.dirPath || '').trim();
+}
+
+function resolveImagePath(imageValue){
+  const raw = normalizePath(imageValue);
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^data:/i.test(raw)) return raw;
+  if (raw.startsWith('/')) return raw;
+
+  const root = getEffectiveImageRoot();
+  if (root && root.startsWith('/')){
+    // 支持 CSV 里已经带 images/ 前缀的情况：root=/.../images + rel=images/xx.jpg -> /.../images/images/xx.jpg
+    // 因此：如果 rel 已经以 images/ 开头，且 root 也以 /images 结尾，则优先去掉一次 images/
+    const rel = raw.replace(/^\.\/+/, '');
+    const rootNorm = root.replace(/\/+$/, '');
+    const relNorm = rel.replace(/^\/+/, '');
+    if (rootNorm.endsWith('/images') && relNorm.startsWith('images/')){
+      return joinPosix(rootNorm, relNorm.slice('images/'.length));
+    }
+    return joinPosix(rootNorm, relNorm);
+  }
+  // root 不可用时，保持原样（server 侧可能按 cwd 解析）
+  return raw;
+}
+
+function toImageSrc(imageValue){
+  const resolved = resolveImagePath(imageValue);
+  if (!resolved) return '';
+  if (/^https?:\/\//i.test(resolved)) return resolved;
+  if (/^data:/i.test(resolved)) return resolved;
+  return apiBinUrl(resolved);
+}
+
+function _basenamePosix(p){
+  const s = String(p || '');
+  const i = s.lastIndexOf('/');
+  return i >= 0 ? s.slice(i+1) : s;
+}
+function _relPath(rootAbs, absFile){
+  const root = String(rootAbs || '').replace(/\/+$/, '');
+  const f = String(absFile || '');
+  if (root && f.startsWith(root + '/')) return f.slice(root.length + 1);
+  return f;
+}
+function _relDirFromRel(rel){
+  const s = String(rel || '');
+  const i = s.lastIndexOf('/');
+  return i >= 0 ? s.slice(0, i) : '';
+}
+
+function buildRowFromFile(absFile){
+  const abs = String(absFile || '').trim();
+  const rel = _relPath(state.dirPath, abs);
+  const relDir = _relDirFromRel(rel);
+
+  // label
+  let label = '';
+  const lm = String(state.labelMode || DEFAULTS.labelMode);
+  if (lm === 'firstDir'){
+    const first = relDir.split('/').filter(Boolean)[0] || '';
+    label = first || '(root)';
+  } else if (lm === 'relDir'){
+    label = relDir || '(root)';
+  } else {
+    label = '';
+  }
+
+  // caption
+  const cm = String(state.captionMode || DEFAULTS.captionMode);
+  let caption = '';
+  if (cm === 'relPath') caption = rel;
+  else if (cm === 'absPath') caption = abs;
+  else caption = _basenamePosix(abs);
+
+  return { path: abs, caption, label };
+}
+
+async function loadFromInputs(){
+  state.dirPath = (els.dirPathInput.value || '').trim() || DEFAULTS.dirPath;
+  state.recursive = true; // 对比模式必须递归
+  state.labelMode = String(els.labelModeSelect.value || DEFAULTS.labelMode);
+  state.captionMode = String(els.captionModeSelect.value || DEFAULTS.captionMode);
+  state.limit = clampInt(parseInt(els.limitInput.value || String(DEFAULTS.limit), 10), 1, 200000, DEFAULTS.limit);
+  persistSettings();
+  syncInputsFromState();
+
+  if (!state.dirPath){
+    setStatus('请提供 图片目录（绝对路径）。', 'warn');
+    return;
+  }
+
+  setStatus(`正在读取 validation 根目录（递归）: ${state.dirPath} ...`);
+  try{
+    const resp = await fetch(apiLsUrl(state.dirPath, state.recursive, state.limit), { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const files = (data && Array.isArray(data.files)) ? data.files : [];
+
+    const resolvedRoot = String((data && data.root) || state.dirPath || '').trim() || state.dirPath;
+    const { stepOrder, rows } = buildValidationCompareRows(files, resolvedRoot);
+    state.stepOrder = stepOrder;
+    state.header = ['sample', ...stepOrder];
+    state.rows = rows;
+
+    state.page = 1;
+    state._searchCacheVersion++;
+    applyFilterAndRender(true);
+
+    setStatus(`加载完成：${state.rows.length} 个 sample · steps: ${state.stepOrder.length}（${state.stepOrder.join(', ')}）`, 'ok');
+  }catch(err){
+    console.warn(err);
+    setStatus(`读取失败：${err.message}（请确认后端已提供 /api/ls /api/bin，且 allow-prefix 覆盖该路径）`, 'err');
+  }
+}
+
+function _isStepDirName(seg){
+  const s = String(seg || '').trim();
+  if (s === 'baseline') return true;
+  return /^step_\d+$/i.test(s);
+}
+function _stepSortKey(step){
+  const s = String(step || '');
+  if (s === 'baseline') return -1;
+  const m = s.match(/^step_(\d+)$/i);
+  if (!m) return 999999999;
+  return parseInt(m[1], 10);
+}
+
+function buildValidationCompareRows(files, resolvedRoot){
+  const root = String(resolvedRoot || '').replace(/\/+$/, '');
+  const stepToSampleToAbs = new Map(); // step -> Map(sampleRel -> absPath)
+  const allSamples = new Set();
+
+  for (const f of files || []){
+    const abs = String(f || '').trim();
+    if (!abs) continue;
+    const rel = _relPath(root, abs).replace(/^\/+/, '');
+    if (!rel) continue;
+    const first = rel.split('/').filter(Boolean)[0] || '';
+    if (!_isStepDirName(first)) continue;
+    const rest = rel.slice(first.length).replace(/^\/+/, '');
+    if (!rest) continue;
+    const step = (first.toLowerCase() === 'baseline') ? 'baseline' : first;
+    const sampleRel = rest;
+    if (!sampleRel) continue;
+
+    allSamples.add(sampleRel);
+    if (!stepToSampleToAbs.has(step)) stepToSampleToAbs.set(step, new Map());
+    const mp = stepToSampleToAbs.get(step);
+    // 同一 step 下同名 sample 若重复，优先保留字典序最小（稳定）
+    if (!mp.has(sampleRel) || String(abs).localeCompare(String(mp.get(sampleRel))) < 0){
+      mp.set(sampleRel, abs);
+    }
+  }
+
+  const stepOrder = Array.from(stepToSampleToAbs.keys())
+    .sort((a,b)=> _stepSortKey(a) - _stepSortKey(b) || String(a).localeCompare(String(b)));
+
+  const samplesSorted = Array.from(allSamples).sort((a,b)=> String(a).localeCompare(String(b)));
+  const rows = samplesSorted.map(sample=>{
+    const paths = {};
+    for (const step of stepOrder){
+      const mp = stepToSampleToAbs.get(step);
+      const p = mp ? mp.get(sample) : '';
+      if (p) paths[step] = p;
+    }
+    return { sample, paths };
+  });
+
+  return { stepOrder, rows };
+}
+
+function buildLabelStats(){
+  const col = String(state.labelCol || '').trim();
+  const stats = new Map();
+  for (const r of state.rows){
+    const v = String((r && r[col]) || '').trim();
+    if (!v) continue;
+    stats.set(v, (stats.get(v) || 0) + 1);
+  }
+  state.labelStats = stats;
+
+  // 清理已不存在的选择
+  const keep = new Set();
+  for (const v of state.selectedLabels){
+    if (stats.has(v)) keep.add(v);
+  }
+  state.selectedLabels = keep;
+  persistSettings();
+}
+
+function renderLabelFilters(){
+  const wrap = els.labelFilters;
+  while (wrap.childNodes.length > 1) wrap.removeChild(wrap.lastChild);
+
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = 'chip';
+  allBtn.textContent = '全部';
+  allBtn.title = '清空选择，展示所有 label';
+  allBtn.addEventListener('click', ()=>{
+    state.selectedLabels.clear();
+    persistSettings();
+    renderLabelFilters();
+    applyFilterAndRender(true);
+  });
+  wrap.appendChild(allBtn);
+
+  const entries = Array.from(state.labelStats.entries())
+    .sort((a,b)=> b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+  for (const [label, count] of entries){
+    const chip = document.createElement('label');
+    chip.className = 'chip';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = state.selectedLabels.size === 0 ? false : state.selectedLabels.has(label);
+    input.addEventListener('change', ()=>{
+      if (input.checked) state.selectedLabels.add(label);
+      else state.selectedLabels.delete(label);
+      persistSettings();
+      applyFilterAndRender(true);
+    });
+    chip.appendChild(input);
+    const span = document.createElement('span');
+    span.textContent = `${label} (${count})`;
+    chip.appendChild(span);
+    wrap.appendChild(chip);
+  }
+}
+
+function rowSearchTextLower(r){
+  const v = state._searchCacheVersion;
+  if (r && r.__searchTextLower && r.__searchTextLower_v === v) return r.__searchTextLower;
+  const parts = [];
+  for (const k of state.header){
+    if (!k) continue;
+    const val = r[k];
+    if (val == null) continue;
+    const str = String(val);
+    if (!str) continue;
+    parts.push(str);
+  }
+  const text = parts.join(' ').toLowerCase();
+  try{ r.__searchTextLower = text; r.__searchTextLower_v = v; }catch{}
+  return text;
+}
+
+function applyFilterAndRender(resetPage=false){
+  const q = String(state.query || '').trim().toLowerCase();
+
+  const filtered = state.rows.filter(r=>{
+    if (!q) return true;
+    const sample = String((r && r.sample) || '').toLowerCase();
+    if (sample.includes(q)) return true;
+    // 允许搜索 step 名
+    const steps = state.stepOrder || [];
+    for (const step of steps){
+      if (String(step).toLowerCase().includes(q)) return true;
+    }
+    return false;
+  });
+
+  state.filteredRows = filtered;
+  if (resetPage) state.page = 1;
+  renderPaged();
+}
+
+function setPageSize(n){
+  if (!Number.isFinite(n) || n <= 0) n = DEFAULTS.pageSize;
+  state.pageSize = n;
+  setSelectValue(els.pageSizeSelect, n);
+  setSelectValue(els.pageSizeSelectFloat, n);
+  state.page = 1;
+  persistSettings();
+  renderPaged();
+}
+
+function gotoPage(p){
+  const totalPages = Math.max(1, Math.ceil(state.filteredRows.length / state.pageSize));
+  p = Math.min(Math.max(1, p), totalPages);
+  state.page = p;
+  renderPaged();
+}
+
+function renderPaged(){
+  const total = state.filteredRows.length;
+  const pageSize = state.pageSize;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (state.page > totalPages) state.page = totalPages;
+  const start = (state.page - 1) * pageSize;
+  const end = Math.min(start + pageSize, total);
+  const slice = state.filteredRows.slice(start, end);
+
+  renderCompare(slice);
+
+  els.pagerBox.hidden = total === 0;
+  els.jumpInput.min = 1;
+  els.jumpInput.max = totalPages;
+  els.jumpInput.value = state.page;
+  els.pagerInfo.textContent = `第 ${state.page}/${totalPages} 页 · 共 ${total} 条 · 本页 ${slice.length} 条`;
+}
+
+function escapeHTML(s){
+  return String(s)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'",'&#39;');
+}
+
+function errorPlaceholder(msg){
+  const d = document.createElement('div');
+  d.style.padding = '14px';
+  d.style.color = 'var(--muted)';
+  d.style.textAlign = 'center';
+  d.innerHTML = `<div style="margin-bottom:8px;">🖼️</div><div class="warn small">${escapeHTML(msg)}</div>`;
+  return d;
+}
+
+function renderCompare(rows){
+  els.gallery.innerHTML = '';
+  els.empty.style.display = rows.length ? 'none' : 'block';
+  if (!rows.length) return;
+
+  const steps = Array.isArray(state.stepOrder) ? state.stepOrder : [];
+
+  for (const r of rows){
+    const rowWrap = document.createElement('div');
+    rowWrap.className = 'compare-row';
+
+    const head = document.createElement('div');
+    head.className = 'compare-row-head';
+
+    const sample = document.createElement('div');
+    sample.className = 'compare-sample mono small';
+    sample.textContent = String((r && r.sample) || '');
+    head.appendChild(sample);
+
+    const strip = document.createElement('div');
+    strip.className = 'compare-strip';
+
+    for (const step of steps){
+      const cell = document.createElement('div');
+      cell.className = 'compare-cell';
+
+      const stepBar = document.createElement('div');
+      stepBar.className = 'compare-step';
+      stepBar.innerHTML = `<span class="mono">${escapeHTML(step)}</span>` +
+        (step === 'baseline' ? `<span class="badge">base</span>` : `<span class="badge">${escapeHTML(step.replace(/^step_/i,''))}</span>`);
+      cell.appendChild(stepBar);
+
+      const imgBox = document.createElement('div');
+      imgBox.className = 'imgbox';
+      const rawPath = String((r && r.paths && r.paths[step]) || '').trim();
+      if (!rawPath){
+        imgBox.appendChild(errorPlaceholder('缺失'));
+      } else {
+        const img = new Image();
+        img.alt = `${step}: ${String((r && r.sample) || '')}`;
+        img.decoding = 'async';
+        img.loading = 'lazy';
+        img.src = toImageSrc(rawPath);
+        img.addEventListener('error', ()=>{
+          const resolved = resolveImagePath(rawPath);
+          const openHref = resolved ? apiBinUrl(resolved) : '';
+          const d = document.createElement('div');
+          d.style.padding = '12px';
+          d.style.textAlign = 'center';
+          d.innerHTML = `<div class="warn small">无法加载图片</div>` +
+            `<div class="small mono" style="margin-top:6px; color:var(--muted); word-break:break-word">${escapeHTML(resolved || rawPath)}</div>` +
+            (openHref ? `<div class="small mono" style="margin-top:8px;"><a href="${openHref}" target="_blank" rel="noreferrer">打开 /api/bin（看具体报错）</a></div>` : '');
+          img.replaceWith(d);
+        });
+        imgBox.appendChild(img);
+      }
+      cell.appendChild(imgBox);
+      strip.appendChild(cell);
+    }
+
+    head.appendChild(strip);
+    rowWrap.appendChild(head);
+    els.gallery.appendChild(rowWrap);
+  }
+}
+
+function debounce(fn, ms){
+  let t = null;
+  return (...args)=>{
+    if (t) clearTimeout(t);
+    t = setTimeout(()=>fn(...args), ms);
+  };
+}
+</script>
+</body>
+</html>
+

@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CSV 图库查看器（图片 + caption + label筛选）</title>
+  <style>
+    :root{
+      --bg:#0b1116;
+      --card:#111a22;
+      --muted:#8aa0b2;
+      --text:#e8f0f6;
+      --accent:#4aa3ff;
+      --border:#1e2a35;
+      --warn:#ffb020;
+      --err:#ff6b6b;
+      --ok:#22c55e;
+      --chip:#0e1820;
+      --kv-bg:#0d1720;
+      --imgSize: 220px;
+      --fit: contain;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:linear-gradient(180deg, #0b1116, #0a121a);
+      color:var(--text);
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      background:rgba(11,17,22,.86);
+      backdrop-filter:saturate(140%) blur(8px);
+      border-bottom:1px solid var(--border);
+    }
+    .container{max-width:1500px; margin:0 auto; padding:16px;}
+    h1{font-size:18px; margin:0}
+    main{padding:16px}
+
+    .settings-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
+    .settings-toggle{
+      background:transparent; border:1px solid var(--border); color:var(--text);
+      padding:6px 10px; border-radius:10px; cursor:pointer; font-weight:600;
+    }
+    .settings-body.hidden{ display:none; }
+
+    .controls{display:flex; flex-wrap:wrap; gap:12px; align-items:center;}
+    .control{
+      background:var(--card); border:1px solid var(--border); border-radius:10px;
+      padding:10px 12px; display:flex; gap:10px; align-items:center;
+    }
+    input[type="text"], input[type="number"], select{
+      color:var(--text); background:transparent; border:none; outline:none; max-width:100%;
+    }
+    input[type="range"]{ width: 180px; }
+    .btn{
+      background:var(--accent); color:#001325; border:none;
+      padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700;
+    }
+    .btn-outline{
+      background:transparent;
+      color:var(--text);
+      border:1px solid var(--border);
+      padding:6px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:700;
+    }
+    .btn-outline:disabled{opacity:.5; cursor:not-allowed}
+    .btn-small{ padding:6px 10px; font-size:12px; }
+    .btn:disabled{opacity:.5; cursor:not-allowed}
+    .hint{color:var(--muted); font-size:12px}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;}
+    .small{font-size:12px}
+    .empty{color:var(--muted); text-align:center; padding:40px 0}
+    a{ color: var(--accent); text-decoration:none; }
+
+    .toolbar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    .search{
+      flex:1; min-width:220px; display:flex; gap:8px; align-items:center;
+      background:#0e1820; border:1px solid var(--border); border-radius:10px; padding:8px 10px;
+    }
+    .search input{ flex:1; border:none; outline:none; background:transparent; color:var(--text); }
+
+    .filters{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    .chip{
+      display:inline-flex; align-items:center; gap:6px;
+      padding:4px 8px; border-radius:999px;
+      border:1px solid var(--border); background:var(--chip);
+      cursor:pointer; user-select:none; font-size:12px;
+    }
+    .chip input{accent-color:var(--accent); cursor:pointer;}
+    .badge{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; border:1px solid var(--border); color:#a9c6db; background:#0a131a; }
+    .ok{color:var(--ok)} .err{color:var(--err)} .warn{color:var(--warn)}
+
+    .gallery{
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(calc(var(--imgSize) + 28px), 1fr));
+      gap:12px;
+      margin-top: 12px;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      min-width: 0;
+    }
+    .imgbox{
+      background:#0c151c;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height: var(--imgSize);
+      overflow:hidden;
+    }
+    .imgbox img{
+      width: 100%;
+      height: 100%;
+      object-fit: var(--fit);
+      display:block;
+    }
+    .card-body{
+      padding:10px 10px 12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      min-width:0;
+    }
+    .caption{
+      font-size:12px;
+      line-height:1.55;
+      color:#d6e4f0;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .meta-line{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .meta-line .mono{ color:#cfe7ff; }
+
+    .pager-float{
+      position:fixed; right:14px; bottom:14px; z-index:20;
+      background:rgba(15,23,32,.92); backdrop-filter: blur(6px) saturate(140%);
+      border:1px solid var(--border); border-radius:12px; padding:10px; min-width:260px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+    .pager-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .pager-row .btn{ padding:8px 10px; }
+    .pager-row select, .pager-row input[type="number"]{
+      background:#0e1820; border:1px solid var(--border); border-radius:8px; color:var(--text);
+      padding:6px 8px; width:auto; min-width:86px;
+    }
+    .pager-info{ color:var(--muted); font-size:12px; margin-top:6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="settings-head">
+        <h1>CSV 图库：读取 CSV → 展示图片 + caption（支持 label 筛选 / 图像尺寸 / 根目录）</h1>
+        <button id="settingsToggleBtn" class="settings-toggle" type="button">收起设置 ▾</button>
+      </div>
+
+      <div id="settingsBody" class="settings-body">
+        <div class="controls">
+          <label class="control" style="flex:1 1 520px">
+            <span>CSV 路径</span>
+            <input id="csvPathInput" type="text" class="mono" placeholder="Dataset/.../data.csv" />
+          </label>
+          <button id="loadBtn" class="btn" type="button">加载</button>
+          <span id="status" class="hint">通过同源 API 读取：`/api/csv?path=...`（优先）/ ` /api/text?path=...`（兜底）与 ` /api/bin?path=...`（图片）。</span>
+        </div>
+
+        <div class="controls" style="margin-top:10px;">
+          <label class="control" style="flex:1 1 520px">
+            <span>图片根目录（绝对路径）</span>
+            <input id="imageRootInput" type="text" class="mono" placeholder="默认：CSV 同目录 /images" />
+          </label>
+          <label class="control">
+            <span class="small muted">自动用 CSV目录/images</span>
+            <input id="autoImageRootInput" type="checkbox" />
+          </label>
+          <div class="control">
+            <span>图片列</span>
+            <select id="imageColSelect" class="mono"></select>
+          </div>
+          <div class="control">
+            <span>caption列</span>
+            <select id="captionColSelect" class="mono"></select>
+          </div>
+          <div class="control">
+            <span>label列</span>
+            <select id="labelColSelect" class="mono"></select>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div class="search">
+            <span class="small muted">搜索（caption/元信息）：</span>
+            <input id="queryInput" placeholder="例如：bird / vermeer / train（空=不过滤）" />
+          </div>
+          <div class="control">
+            <span>每页</span>
+            <select id="pageSizeSelect">
+              <option value="6">6</option>
+              <option value="8">8</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="60" selected>60</option>
+              <option value="120">120</option>
+              <option value="240">240</option>
+              <option value="600">600</option>
+            </select>
+          </div>
+          <div class="control">
+            <span>尺寸</span>
+            <input id="imgSizeRange" type="range" min="80" max="560" step="10" />
+            <input id="imgSizeNumber" type="number" min="80" max="560" step="10" style="width:86px;" />
+            <span class="small muted">px</span>
+          </div>
+          <div class="control">
+            <span>适配</span>
+            <select id="fitSelect">
+              <option value="contain" selected>contain（完整显示）</option>
+              <option value="cover">cover（铺满裁剪）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="filters" id="labelFilters">
+          <div class="hint">label 筛选：</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="gallery" class="gallery"></div>
+    <div id="empty" class="empty">暂无数据</div>
+  </main>
+
+  <div class="pager-float" id="pagerBox" hidden>
+    <div class="pager-row">
+      <button id="prevBtn" class="btn" type="button">上一页</button>
+      <button id="nextBtn" class="btn" type="button">下一页</button>
+      <label style="display:inline-flex; align-items:center; gap:6px;">
+        <span class="small muted">跳转</span>
+        <input id="jumpInput" type="number" min="1" step="1" value="1" />
+      </label>
+      <label style="display:inline-flex; align-items:center; gap:6px;">
+        <span class="small muted">每页</span>
+        <select id="pageSizeSelectFloat">
+          <option value="6">6</option>
+          <option value="8">8</option>
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="60" selected>60</option>
+          <option value="120">120</option>
+          <option value="240">240</option>
+          <option value="600">600</option>
+        </select>
+      </label>
+    </div>
+    <div class="pager-info" id="pagerInfo">第 1/1 页 · 共 0 条</div>
+  </div>
+
+<script>
+const STORAGE_KEYS = {
+  csvPath: 'csvGalleryViewer:csvPath',
+  collapseSettings: 'csvGalleryViewer:collapseSettings',
+  imageRoot: 'csvGalleryViewer:imageRoot',
+  autoImageRoot: 'csvGalleryViewer:autoImageRoot',
+  imageCol: 'csvGalleryViewer:imageCol',
+  captionCol: 'csvGalleryViewer:captionCol',
+  labelCol: 'csvGalleryViewer:labelCol',
+  selectedLabels: 'csvGalleryViewer:selectedLabels',
+  pageSize: 'csvGalleryViewer:pageSize',
+  query: 'csvGalleryViewer:query',
+  imgSize: 'csvGalleryViewer:imgSize',
+  fit: 'csvGalleryViewer:fit',
+};
+
+const DEFAULTS = {
+  csvPath: 'Dataset/your_dataset/data.csv',
+  imageRoot: '', // 为空时：用 CSV 同目录 /images
+  autoImageRoot: true,
+  imageCol: 'file_name',
+  captionCol: 'description',
+  labelCol: 'genre',
+  selectedLabels: [],
+  pageSize: 60,
+  query: '',
+  imgSize: 220,
+  fit: 'contain',
+};
+
+const IMAGE_EXT_LIST = ['jpg','jpeg','png','webp','bmp','gif','tif','tiff','heic','heif'];
+const KNOWN_IMAGE_EXTENSIONS = new Set(IMAGE_EXT_LIST);
+
+const state = {
+  header: [],
+  rows: [],
+  filteredRows: [],
+  page: 1,
+  pageSize: DEFAULTS.pageSize,
+  csvPath: DEFAULTS.csvPath,
+  imageRoot: DEFAULTS.imageRoot,
+  autoImageRoot: DEFAULTS.autoImageRoot,
+  imageCol: DEFAULTS.imageCol,
+  captionCol: DEFAULTS.captionCol,
+  labelCol: DEFAULTS.labelCol,
+  selectedLabels: new Set(DEFAULTS.selectedLabels || []),
+  labelStats: new Map(), // label -> count
+  query: DEFAULTS.query,
+  imgSize: DEFAULTS.imgSize,
+  fit: DEFAULTS.fit,
+  ui: { collapseSettings: false },
+  _searchCacheVersion: 0,
+};
+
+const els = {
+  settingsBody: document.getElementById('settingsBody'),
+  settingsToggleBtn: document.getElementById('settingsToggleBtn'),
+  csvPathInput: document.getElementById('csvPathInput'),
+  loadBtn: document.getElementById('loadBtn'),
+  status: document.getElementById('status'),
+  imageRootInput: document.getElementById('imageRootInput'),
+  autoImageRootInput: document.getElementById('autoImageRootInput'),
+  imageColSelect: document.getElementById('imageColSelect'),
+  captionColSelect: document.getElementById('captionColSelect'),
+  labelColSelect: document.getElementById('labelColSelect'),
+  queryInput: document.getElementById('queryInput'),
+  pageSizeSelect: document.getElementById('pageSizeSelect'),
+  pageSizeSelectFloat: document.getElementById('pageSizeSelectFloat'),
+  imgSizeRange: document.getElementById('imgSizeRange'),
+  imgSizeNumber: document.getElementById('imgSizeNumber'),
+  fitSelect: document.getElementById('fitSelect'),
+  labelFilters: document.getElementById('labelFilters'),
+  gallery: document.getElementById('gallery'),
+  empty: document.getElementById('empty'),
+  pagerBox: document.getElementById('pagerBox'),
+  prevBtn: document.getElementById('prevBtn'),
+  nextBtn: document.getElementById('nextBtn'),
+  jumpInput: document.getElementById('jumpInput'),
+  pagerInfo: document.getElementById('pagerInfo'),
+};
+
+init();
+
+function init(){
+  loadStoredSettings();
+  syncInputsFromState();
+  applySettingsCollapseUI();
+  applyImageSizeToCss();
+  applyFitToCss();
+
+  els.loadBtn.addEventListener('click', loadFromInputs);
+  els.settingsToggleBtn.addEventListener('click', ()=>{
+    state.ui.collapseSettings = !state.ui.collapseSettings;
+    applySettingsCollapseUI();
+    persistSettings();
+  });
+
+  els.autoImageRootInput.addEventListener('change', ()=>{
+    state.autoImageRoot = !!els.autoImageRootInput.checked;
+    if (state.autoImageRoot){
+      // 立即同步到 UI（展示自动推导结果）
+      syncInputsFromState();
+    }
+    persistSettings();
+    renderPaged();
+  });
+  els.imageRootInput.addEventListener('change', ()=>{
+    state.imageRoot = (els.imageRootInput.value || '').trim();
+    persistSettings();
+    renderPaged();
+  });
+
+  els.imageColSelect.addEventListener('change', ()=>{
+    state.imageCol = (els.imageColSelect.value || '').trim();
+    persistSettings();
+    state._searchCacheVersion++;
+    applyFilterAndRender(true);
+  });
+  els.captionColSelect.addEventListener('change', ()=>{
+    state.captionCol = (els.captionColSelect.value || '').trim();
+    persistSettings();
+    state._searchCacheVersion++;
+    applyFilterAndRender(true);
+  });
+  els.labelColSelect.addEventListener('change', ()=>{
+    state.labelCol = (els.labelColSelect.value || '').trim();
+    state.selectedLabels.clear(); // label 列变化后清空选择更直观
+    persistSettings();
+    buildLabelStats();
+    renderLabelFilters();
+    applyFilterAndRender(true);
+  });
+
+  const onQueryInput = debounce(()=>{
+    state.query = (els.queryInput.value || '').trim();
+    persistSettings();
+    applyFilterAndRender(true);
+  }, 120);
+  els.queryInput.addEventListener('input', onQueryInput);
+
+  els.pageSizeSelect.addEventListener('change', (e)=>setPageSize(parseInt(e.target.value||DEFAULTS.pageSize, 10)));
+  els.pageSizeSelectFloat.addEventListener('change', (e)=>setPageSize(parseInt(e.target.value||DEFAULTS.pageSize, 10)));
+  els.prevBtn.addEventListener('click', ()=>gotoPage(state.page - 1));
+  els.nextBtn.addEventListener('click', ()=>gotoPage(state.page + 1));
+  els.jumpInput.addEventListener('change', ()=>{
+    const p = parseInt(els.jumpInput.value||'1', 10);
+    gotoPage(p);
+  });
+
+  els.imgSizeRange.addEventListener('input', ()=>{
+    const n = parseInt(els.imgSizeRange.value||String(DEFAULTS.imgSize), 10);
+    setImgSize(n, false);
+  });
+  els.imgSizeRange.addEventListener('change', ()=>{
+    const n = parseInt(els.imgSizeRange.value||String(DEFAULTS.imgSize), 10);
+    setImgSize(n, true);
+  });
+  els.imgSizeNumber.addEventListener('change', ()=>{
+    const n = parseInt(els.imgSizeNumber.value||String(DEFAULTS.imgSize), 10);
+    setImgSize(n, true);
+  });
+  els.fitSelect.addEventListener('change', ()=>{
+    state.fit = String(els.fitSelect.value || DEFAULTS.fit);
+    applyFitToCss();
+    persistSettings();
+  });
+
+  // 自动加载
+  loadFromInputs().catch(()=>{});
+}
+
+function setStatus(msg, cls=''){
+  els.status.textContent = msg;
+  els.status.className = 'hint ' + cls;
+}
+
+function applySettingsCollapseUI(){
+  const collapsed = !!state.ui.collapseSettings;
+  if (collapsed){
+    els.settingsBody.classList.add('hidden');
+    els.settingsToggleBtn.textContent = '展开设置 ▸';
+  } else {
+    els.settingsBody.classList.remove('hidden');
+    els.settingsToggleBtn.textContent = '收起设置 ▾';
+  }
+}
+
+function applyImageSizeToCss(){
+  const n = clampInt(state.imgSize, 80, 560, DEFAULTS.imgSize);
+  document.documentElement.style.setProperty('--imgSize', `${n}px`);
+}
+function applyFitToCss(){
+  const v = (state.fit === 'cover') ? 'cover' : 'contain';
+  document.documentElement.style.setProperty('--fit', v);
+}
+
+function setImgSize(n, shouldPersist){
+  state.imgSize = clampInt(n, 80, 560, DEFAULTS.imgSize);
+  els.imgSizeRange.value = String(state.imgSize);
+  els.imgSizeNumber.value = String(state.imgSize);
+  applyImageSizeToCss();
+  if (shouldPersist) persistSettings();
+}
+
+function clampInt(n, min, max, fallback){
+  n = parseInt(n, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function persistSettings(){
+  if (typeof localStorage === 'undefined') return;
+  try{
+    localStorage.setItem(STORAGE_KEYS.csvPath, state.csvPath || '');
+    localStorage.setItem(STORAGE_KEYS.collapseSettings, state.ui.collapseSettings ? '1' : '0');
+    localStorage.setItem(STORAGE_KEYS.imageRoot, state.imageRoot || '');
+    localStorage.setItem(STORAGE_KEYS.autoImageRoot, state.autoImageRoot ? '1' : '0');
+    localStorage.setItem(STORAGE_KEYS.imageCol, state.imageCol || '');
+    localStorage.setItem(STORAGE_KEYS.captionCol, state.captionCol || '');
+    localStorage.setItem(STORAGE_KEYS.labelCol, state.labelCol || '');
+    localStorage.setItem(STORAGE_KEYS.selectedLabels, JSON.stringify(Array.from(state.selectedLabels || [])));
+    localStorage.setItem(STORAGE_KEYS.pageSize, String(state.pageSize || DEFAULTS.pageSize));
+    localStorage.setItem(STORAGE_KEYS.query, state.query || '');
+    localStorage.setItem(STORAGE_KEYS.imgSize, String(state.imgSize || DEFAULTS.imgSize));
+    localStorage.setItem(STORAGE_KEYS.fit, state.fit || DEFAULTS.fit);
+  }catch{}
+}
+
+function loadStoredSettings(){
+  if (typeof localStorage === 'undefined') return;
+  try{
+    const csvPath = localStorage.getItem(STORAGE_KEYS.csvPath);
+    if (csvPath) state.csvPath = csvPath;
+    const cs = localStorage.getItem(STORAGE_KEYS.collapseSettings);
+    if (cs != null) state.ui.collapseSettings = cs === '1';
+    const ir = localStorage.getItem(STORAGE_KEYS.imageRoot);
+    if (ir != null) state.imageRoot = String(ir || '').trim();
+    const air = localStorage.getItem(STORAGE_KEYS.autoImageRoot);
+    if (air != null) state.autoImageRoot = air === '1';
+    const ic = localStorage.getItem(STORAGE_KEYS.imageCol);
+    if (ic != null) state.imageCol = String(ic || '').trim() || DEFAULTS.imageCol;
+    const cc = localStorage.getItem(STORAGE_KEYS.captionCol);
+    if (cc != null) state.captionCol = String(cc || '').trim() || DEFAULTS.captionCol;
+    const lc = localStorage.getItem(STORAGE_KEYS.labelCol);
+    if (lc != null) state.labelCol = String(lc || '').trim() || DEFAULTS.labelCol;
+    const sl = localStorage.getItem(STORAGE_KEYS.selectedLabels);
+    if (sl){
+      try{
+        const arr = JSON.parse(sl);
+        if (Array.isArray(arr)) state.selectedLabels = new Set(arr.map(x=>String(x)));
+      }catch{}
+    }
+    const ps = localStorage.getItem(STORAGE_KEYS.pageSize);
+    if (ps != null && !Number.isNaN(parseInt(ps,10))) state.pageSize = parseInt(ps, 10);
+    const q = localStorage.getItem(STORAGE_KEYS.query);
+    if (q != null) state.query = String(q || '');
+    const isz = localStorage.getItem(STORAGE_KEYS.imgSize);
+    if (isz != null && !Number.isNaN(parseInt(isz,10))) state.imgSize = parseInt(isz, 10);
+    const fit = localStorage.getItem(STORAGE_KEYS.fit);
+    if (fit != null) state.fit = String(fit || DEFAULTS.fit);
+  }catch{}
+}
+
+function syncInputsFromState(){
+  els.csvPathInput.value = state.csvPath || '';
+  els.autoImageRootInput.checked = !!state.autoImageRoot;
+  els.imageRootInput.value = state.imageRoot || '';
+  els.queryInput.value = state.query || '';
+  setSelectValue(els.pageSizeSelect, state.pageSize);
+  setSelectValue(els.pageSizeSelectFloat, state.pageSize);
+  setImgSize(state.imgSize, false);
+  setSelectValue(els.fitSelect, state.fit || DEFAULTS.fit);
+}
+
+function setSelectValue(select, value){
+  if (!select) return;
+  const str = String(value);
+  let option = Array.from(select.options).find(opt=>opt.value === str);
+  if (!option){
+    option = document.createElement('option');
+    option.value = str; option.textContent = str;
+    select.appendChild(option);
+  }
+  select.value = str;
+}
+
+function dirnameOfAbsPath(absPath){
+  const p = String(absPath || '').trim();
+  if (!p || !p.includes('/')) return '';
+  const idx = p.lastIndexOf('/');
+  if (idx <= 0) return '/';
+  return p.slice(0, idx);
+}
+
+function joinPosix(baseDir, relPath){
+  const base = String(baseDir || '').trim();
+  let rel = String(relPath || '').trim();
+  if (!base || !rel) return '';
+  rel = rel.replace(/^\.\/+/, '');
+  const combined = (base.endsWith('/') ? base : base + '/') + rel;
+  const parts = combined.split('/');
+  const stack = [];
+  for (const part of parts){
+    if (part === '' || part === '.') continue;
+    if (part === '..'){ if (stack.length) stack.pop(); continue; }
+    stack.push(part);
+  }
+  return '/' + stack.join('/');
+}
+
+function normalizePath(p){
+  let path = String(p || '').trim();
+  if (!path) return '';
+  if ((path.startsWith('"') && path.endsWith('"')) || (path.startsWith("'") && path.endsWith("'"))) {
+    path = path.slice(1, -1).trim();
+  }
+  if (/^file:\/\//i.test(path)){
+    try{ path = path.replace(/^file:\/\//i, ''); }catch{}
+  }
+  return path;
+}
+
+function apiTextUrl(absPath){ return `/api/text?path=${encodeURIComponent(absPath)}`; }
+function apiCsvUrl(absPath){ return `/api/csv?path=${encodeURIComponent(absPath)}`; }
+function apiBinUrl(absPath){ return `/api/bin?path=${encodeURIComponent(absPath)}`; }
+function apiAppendUrl(absPath){ return `/api/append?path=${encodeURIComponent(absPath)}`; }
+
+function _basenamePosix(p){
+  const s = String(p || '');
+  const i = s.lastIndexOf('/');
+  return i >= 0 ? s.slice(i+1) : s;
+}
+function _dirnamePosix(p){
+  const s = String(p || '').trim();
+  if (!s || !s.includes('/')) return '';
+  const i = s.lastIndexOf('/');
+  if (i <= 0) return '/';
+  return s.slice(0, i);
+}
+
+async function appendSelectedFilenameForImage(absImagePath){
+  const resolved = String(absImagePath || '').trim();
+  if (!resolved.startsWith('/')) throw new Error('image path not absolute');
+  const dir = _dirnamePosix(resolved);
+  const fn = _basenamePosix(resolved);
+  if (!dir || !fn) throw new Error('bad image path');
+  const csvPath = joinPosix(dir, '_selected.csv');
+
+  const resp = await fetch(apiAppendUrl(csvPath), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ line: fn }),
+  });
+  if (!resp.ok){
+    const t = await resp.text().catch(()=> '');
+    throw new Error(`HTTP ${resp.status}: ${t || 'append failed'}`);
+  }
+  return { csvPath, filename: fn };
+}
+
+function cleanColName(name){
+  let s = String(name ?? '');
+  s = s.replace(/[\uFEFF\u200B-\u200D\u2060]/g, '');
+  return s.trim();
+}
+
+function normalizeTableHeaderAndRowsInPlace(header, rows){
+  if (!Array.isArray(header) || !Array.isArray(rows)) return { mapping: new Map(), changed: false };
+  const mapping = new Map();
+  const used = new Set();
+  let changed = false;
+
+  for (let i = 0; i < header.length; i++){
+    const oldKey = String(header[i] ?? '');
+    const cleaned = cleanColName(oldKey);
+    if (!cleaned){
+      header[i] = cleaned;
+      if (oldKey !== cleaned) changed = true;
+      continue;
+    }
+    if (used.has(cleaned)){
+      const fallback = String(oldKey).trim();
+      header[i] = fallback;
+      used.add(fallback);
+      if (fallback !== oldKey) changed = true;
+      continue;
+    }
+    used.add(cleaned);
+    header[i] = cleaned;
+    if (cleaned !== oldKey){
+      mapping.set(oldKey, cleaned);
+      changed = true;
+    }
+  }
+
+  if (changed && mapping.size > 0){
+    for (const r of rows){
+      if (!r || typeof r !== 'object') continue;
+      for (const [oldKey, newKey] of mapping.entries()){
+        if (oldKey === newKey) continue;
+        if (Object.prototype.hasOwnProperty.call(r, oldKey)){
+          if (!Object.prototype.hasOwnProperty.call(r, newKey)){
+            r[newKey] = r[oldKey];
+          }
+          try{ delete r[oldKey]; }catch{}
+        }
+      }
+    }
+  }
+  return { mapping, changed };
+}
+
+function parseCSVLoose(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  const len = text.length;
+  for (let i = 0; i < len; i++) {
+    let c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        const next = text[i + 1];
+        if (next === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\r' || c === '\n') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); field = '';
+        if (row.length > 0 && (row.length > 1 || row[0].trim().length > 0)) rows.push(row);
+        row = [];
+      } else field += c;
+    }
+  }
+  row.push(field);
+  if (row.length > 0 && (row.length > 1 || row[0].trim().length > 0)) rows.push(row);
+  return rows;
+}
+
+function parseCSVWithHeader(text){
+  const rows = parseCSVLoose(text);
+  if (!rows.length) return { header: [], objects: [] };
+  const header = rows[0].map(h => (h||'').trim());
+  const data = rows.slice(1);
+  const objects = [];
+  for (const r of data){
+    if (!r || (r.length===1 && String(r[0]||'').trim()==='')) continue;
+    const obj = {};
+    for (let i = 0; i < header.length; i++){
+      const k = header[i];
+      if (!k) continue;
+      obj[k] = r[i] == null ? '' : String(r[i]);
+    }
+    objects.push(obj);
+  }
+  return { header, objects };
+}
+
+function detectBestColumn(header, preferredLowerList){
+  const lower = header.map(h=>String(h||''));
+  for (const p of preferredLowerList){
+    const idx = lower.findIndex(x=>x.toLowerCase() === p);
+    if (idx >= 0) return header[idx];
+  }
+  return '';
+}
+
+function isImageLikePath(value){
+  const s = String(value || '').trim();
+  if (!s) return false;
+  if (/^https?:\/\//i.test(s)) {
+    const u = s.split('?')[0].split('#')[0];
+    const ext = u.slice(u.lastIndexOf('.') + 1).toLowerCase();
+    return KNOWN_IMAGE_EXTENSIONS.has(ext);
+  }
+  const cleaned = s.split('?')[0].split('#')[0];
+  const lastDot = cleaned.lastIndexOf('.');
+  if (lastDot === -1) return false;
+  const ext = cleaned.slice(lastDot + 1).toLowerCase();
+  return KNOWN_IMAGE_EXTENSIONS.has(ext);
+}
+
+function ensureColumnSelections(){
+  const header = state.header || [];
+  if (!header.length) return;
+
+  // image
+  if (!header.includes(state.imageCol)){
+    const best = detectBestColumn(header, ['file_name','image_path','img_path','image','img','path','file','filename','filepath']);
+    state.imageCol = best || header[0];
+  }
+  // caption
+  if (!header.includes(state.captionCol)){
+    const best = detectBestColumn(header, ['description','caption','text','prompt','title']);
+    state.captionCol = best || (header[1] || header[0]);
+  }
+  // label
+  if (!header.includes(state.labelCol)){
+    const best = detectBestColumn(header, ['genre','label','category','class','style','subset']);
+    state.labelCol = best || (header[2] || header[0]);
+  }
+}
+
+function renderColumnSelects(){
+  const header = state.header || [];
+  const sels = [els.imageColSelect, els.captionColSelect, els.labelColSelect];
+  for (const sel of sels){
+    sel.innerHTML = '';
+    for (const k of header){
+      if (!k) continue;
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = k;
+      sel.appendChild(opt);
+    }
+  }
+  ensureColumnSelections();
+  setSelectValue(els.imageColSelect, state.imageCol);
+  setSelectValue(els.captionColSelect, state.captionCol);
+  setSelectValue(els.labelColSelect, state.labelCol);
+}
+
+function getEffectiveImageRoot(){
+  if (state.autoImageRoot){
+    const dir = dirnameOfAbsPath(state.csvPath);
+    return dir ? joinPosix(dir, 'images') : '';
+  }
+  return String(state.imageRoot || '').trim();
+}
+
+function resolveImagePath(imageValue){
+  const raw = normalizePath(imageValue);
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^data:/i.test(raw)) return raw;
+  if (raw.startsWith('/')) return raw;
+
+  const root = getEffectiveImageRoot();
+  if (root && root.startsWith('/')){
+    // 支持 CSV 里已经带 images/ 前缀的情况：root=/.../images + rel=images/xx.jpg -> /.../images/images/xx.jpg
+    // 因此：如果 rel 已经以 images/ 开头，且 root 也以 /images 结尾，则优先去掉一次 images/
+    const rel = raw.replace(/^\.\/+/, '');
+    const rootNorm = root.replace(/\/+$/, '');
+    const relNorm = rel.replace(/^\/+/, '');
+    if (rootNorm.endsWith('/images') && relNorm.startsWith('images/')){
+      return joinPosix(rootNorm, relNorm.slice('images/'.length));
+    }
+    return joinPosix(rootNorm, relNorm);
+  }
+  // root 不可用时，保持原样（server 侧可能按 cwd 解析）
+  return raw;
+}
+
+function toImageSrc(imageValue){
+  const resolved = resolveImagePath(imageValue);
+  if (!resolved) return '';
+  if (/^https?:\/\//i.test(resolved)) return resolved;
+  if (/^data:/i.test(resolved)) return resolved;
+  return apiBinUrl(resolved);
+}
+
+async function loadFromInputs(){
+  state.csvPath = (els.csvPathInput.value || '').trim() || DEFAULTS.csvPath;
+  state.imageRoot = (els.imageRootInput.value || '').trim();
+  state.autoImageRoot = !!els.autoImageRootInput.checked;
+  persistSettings();
+  syncInputsFromState();
+
+  if (!state.csvPath){
+    setStatus('请提供 CSV 绝对路径。', 'warn');
+    return;
+  }
+
+  setStatus(`正在读取 CSV: ${state.csvPath} ...`);
+  try{
+    let loaded = false;
+    try{
+      const r2 = await fetch(apiCsvUrl(state.csvPath), { cache: 'no-store' });
+      if (r2.ok){
+        const data = await r2.json();
+        if (data && Array.isArray(data.header) && Array.isArray(data.rows)){
+          state.header = data.header;
+          state.rows = data.rows;
+          normalizeTableHeaderAndRowsInPlace(state.header, state.rows);
+          loaded = true;
+        }
+      }
+    }catch{}
+
+    if (!loaded){
+      const resp = await fetch(apiTextUrl(state.csvPath), { cache: 'no-store' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const text = await resp.text();
+      const parsed = parseCSVWithHeader(text);
+      state.header = parsed.header;
+      state.rows = parsed.objects;
+      normalizeTableHeaderAndRowsInPlace(state.header, state.rows);
+    }
+
+    state.page = 1;
+    state._searchCacheVersion++;
+    renderColumnSelects();
+    buildLabelStats();
+    renderLabelFilters();
+    applyFilterAndRender(true);
+
+    const root = getEffectiveImageRoot();
+    const rootMsg = root ? ` · 图片根：${root}` : ' · 图片根：未设置';
+    setStatus(`加载完成：${state.rows.length} 条${rootMsg}`, 'ok');
+  }catch(err){
+    console.warn(err);
+    setStatus(`读取失败：${err.message}（请确认后端已提供 /api/csv /api/text /api/bin，且 allow-prefix 覆盖该路径）`, 'err');
+  }
+}
+
+function buildLabelStats(){
+  const col = String(state.labelCol || '').trim();
+  const stats = new Map();
+  for (const r of state.rows){
+    const v = String((r && r[col]) || '').trim();
+    if (!v) continue;
+    stats.set(v, (stats.get(v) || 0) + 1);
+  }
+  state.labelStats = stats;
+
+  // 清理已不存在的选择
+  const keep = new Set();
+  for (const v of state.selectedLabels){
+    if (stats.has(v)) keep.add(v);
+  }
+  state.selectedLabels = keep;
+  persistSettings();
+}
+
+function renderLabelFilters(){
+  const wrap = els.labelFilters;
+  while (wrap.childNodes.length > 1) wrap.removeChild(wrap.lastChild);
+
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = 'chip';
+  allBtn.textContent = '全部';
+  allBtn.title = '清空选择，展示所有 label';
+  allBtn.addEventListener('click', ()=>{
+    state.selectedLabels.clear();
+    persistSettings();
+    renderLabelFilters();
+    applyFilterAndRender(true);
+  });
+  wrap.appendChild(allBtn);
+
+  const entries = Array.from(state.labelStats.entries())
+    .sort((a,b)=> b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+  for (const [label, count] of entries){
+    const chip = document.createElement('label');
+    chip.className = 'chip';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = state.selectedLabels.size === 0 ? false : state.selectedLabels.has(label);
+    input.addEventListener('change', ()=>{
+      if (input.checked) state.selectedLabels.add(label);
+      else state.selectedLabels.delete(label);
+      persistSettings();
+      applyFilterAndRender(true);
+    });
+    chip.appendChild(input);
+    const span = document.createElement('span');
+    span.textContent = `${label} (${count})`;
+    chip.appendChild(span);
+    wrap.appendChild(chip);
+  }
+}
+
+function rowSearchTextLower(r){
+  const v = state._searchCacheVersion;
+  if (r && r.__searchTextLower && r.__searchTextLower_v === v) return r.__searchTextLower;
+  const parts = [];
+  for (const k of state.header){
+    if (!k) continue;
+    const val = r[k];
+    if (val == null) continue;
+    const str = String(val);
+    if (!str) continue;
+    parts.push(str);
+  }
+  const text = parts.join(' ').toLowerCase();
+  try{ r.__searchTextLower = text; r.__searchTextLower_v = v; }catch{}
+  return text;
+}
+
+function applyFilterAndRender(resetPage=false){
+  const labelCol = String(state.labelCol || '').trim();
+  const useLabel = state.selectedLabels.size > 0;
+  const q = String(state.query || '').trim().toLowerCase();
+
+  const filtered = state.rows.filter(r=>{
+    if (useLabel){
+      const v = String((r && r[labelCol]) || '').trim();
+      if (!state.selectedLabels.has(v)) return false;
+    }
+    if (!q) return true;
+    const text = rowSearchTextLower(r);
+    return text.includes(q);
+  });
+
+  state.filteredRows = filtered;
+  if (resetPage) state.page = 1;
+  renderPaged();
+}
+
+function setPageSize(n){
+  if (!Number.isFinite(n) || n <= 0) n = DEFAULTS.pageSize;
+  state.pageSize = n;
+  setSelectValue(els.pageSizeSelect, n);
+  setSelectValue(els.pageSizeSelectFloat, n);
+  state.page = 1;
+  persistSettings();
+  renderPaged();
+}
+
+function gotoPage(p){
+  const totalPages = Math.max(1, Math.ceil(state.filteredRows.length / state.pageSize));
+  p = Math.min(Math.max(1, p), totalPages);
+  state.page = p;
+  renderPaged();
+}
+
+function renderPaged(){
+  const total = state.filteredRows.length;
+  const pageSize = state.pageSize;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (state.page > totalPages) state.page = totalPages;
+  const start = (state.page - 1) * pageSize;
+  const end = Math.min(start + pageSize, total);
+  const slice = state.filteredRows.slice(start, end);
+
+  renderGallery(slice);
+
+  els.pagerBox.hidden = total === 0;
+  els.jumpInput.min = 1;
+  els.jumpInput.max = totalPages;
+  els.jumpInput.value = state.page;
+  els.pagerInfo.textContent = `第 ${state.page}/${totalPages} 页 · 共 ${total} 条 · 本页 ${slice.length} 条`;
+}
+
+function escapeHTML(s){
+  return String(s)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'",'&#39;');
+}
+
+function errorPlaceholder(msg){
+  const d = document.createElement('div');
+  d.style.padding = '14px';
+  d.style.color = 'var(--muted)';
+  d.style.textAlign = 'center';
+  d.innerHTML = `<div style="margin-bottom:8px;">🖼️</div><div class="warn small">${escapeHTML(msg)}</div>`;
+  return d;
+}
+
+function renderGallery(rows){
+  els.gallery.innerHTML = '';
+  els.empty.style.display = rows.length ? 'none' : 'block';
+  if (!rows.length) return;
+
+  const imageCol = String(state.imageCol || '').trim();
+  const captionCol = String(state.captionCol || '').trim();
+  const labelCol = String(state.labelCol || '').trim();
+
+  // 一些常见补充字段（可为空）
+  const idCol = (state.header || []).includes('id') ? 'id' : ((state.header || []).includes('ID') ? 'ID' : '');
+  const artistCol = (state.header || []).includes('artist') ? 'artist' : '';
+  const nameCol = (state.header || []).includes('painting_name') ? 'painting_name' : '';
+  const subsetCol = (state.header || []).includes('subset') ? 'subset' : '';
+
+  for (const r of rows){
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const imgBox = document.createElement('div');
+    imgBox.className = 'imgbox';
+    const rawPath = String((r && r[imageCol]) || '').trim();
+    if (!rawPath){
+      imgBox.appendChild(errorPlaceholder('图片路径为空'));
+    } else {
+      const img = new Image();
+      img.alt = rawPath;
+      img.decoding = 'async';
+      img.loading = 'lazy';
+      img.src = toImageSrc(rawPath);
+      img.addEventListener('error', ()=>{
+        const resolved = resolveImagePath(rawPath);
+        const openHref = resolved ? apiBinUrl(resolved) : '';
+        const d = document.createElement('div');
+        d.style.padding = '12px';
+        d.style.textAlign = 'center';
+        d.innerHTML = `<div class="warn small">无法加载图片</div>` +
+          `<div class="small mono" style="margin-top:6px; color:var(--muted); word-break:break-word">${escapeHTML(resolved || rawPath)}</div>` +
+          (openHref ? `<div class="small mono" style="margin-top:8px;"><a href="${openHref}" target="_blank" rel="noreferrer">打开 /api/bin（看具体报错）</a></div>` : '');
+        img.replaceWith(d);
+      });
+      imgBox.appendChild(img);
+    }
+    card.appendChild(imgBox);
+
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    const meta = document.createElement('div');
+    meta.className = 'meta-line';
+    const label = String((r && r[labelCol]) || '').trim();
+    if (label) meta.innerHTML += `<span class="badge">${escapeHTML(label)}</span>`;
+    if (subsetCol){
+      const subset = String((r && r[subsetCol]) || '').trim();
+      if (subset) meta.innerHTML += `<span class="badge" style="opacity:.9">${escapeHTML(subset)}</span>`;
+    }
+    if (artistCol){
+      const artist = String((r && r[artistCol]) || '').trim();
+      if (artist) meta.innerHTML += `<span class="small muted">artist:</span><span class="mono">${escapeHTML(artist)}</span>`;
+    }
+    body.appendChild(meta);
+
+    // 将 id 列展示在 label 下方（若存在）
+    if (idCol){
+      const idv = String((r && r[idCol]) || '').trim();
+      if (idv){
+        const idLine = document.createElement('div');
+        idLine.className = 'meta-line';
+        idLine.innerHTML = `<span class="small muted">id:</span><span class="mono">${escapeHTML(idv)}</span>`;
+        body.appendChild(idLine);
+      }
+    }
+
+    if (nameCol){
+      const name = String((r && r[nameCol]) || '').trim();
+      if (name){
+        const t = document.createElement('div');
+        t.className = 'caption';
+        t.style.color = '#cfe7ff';
+        t.textContent = name;
+        body.appendChild(t);
+      }
+    }
+
+    const caption = String((r && r[captionCol]) || '').trim();
+    const cap = document.createElement('div');
+    cap.className = 'caption';
+    cap.textContent = caption || '(caption 为空)';
+    body.appendChild(cap);
+
+    // 选择按钮：把“该图片文件名”追加写入到“图片同目录”的 _selected.csv
+    const resolved = resolveImagePath(rawPath);
+    const canWrite = resolved && resolved.startsWith('/');
+    const selectWrap = document.createElement('div');
+    selectWrap.className = 'meta-line';
+    selectWrap.style.justifyContent = 'space-between';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-outline btn-small';
+    btn.textContent = '加入 _selected.csv';
+    btn.disabled = !canWrite;
+    btn.title = canWrite ? `写入：${_dirnamePosix(resolved)}/_selected.csv` : '仅支持本地绝对路径图片（非 http/data）';
+    btn.addEventListener('click', async ()=>{
+      if (!canWrite) return;
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.textContent = '写入中...';
+      try{
+        const out = await appendSelectedFilenameForImage(resolved);
+        btn.textContent = '已加入';
+        btn.title = `已写入：${out.csvPath}`;
+      }catch(e){
+        console.warn(e);
+        btn.disabled = false;
+        btn.textContent = old;
+        alert(`写入失败：${e && e.message ? e.message : e}`);
+      }
+    });
+
+    const hint = document.createElement('div');
+    hint.className = 'hint small';
+    hint.textContent = canWrite ? _basenamePosix(resolved) : '不可写（非绝对路径）';
+
+    selectWrap.appendChild(btn);
+    selectWrap.appendChild(hint);
+    body.appendChild(selectWrap);
+
+    card.appendChild(body);
+    els.gallery.appendChild(card);
+  }
+}
+
+function debounce(fn, ms){
+  let t = null;
+  return (...args)=>{
+    if (t) clearTimeout(t);
+    t = setTimeout(()=>fn(...args), ms);
+  };
+}
+</script>
+</body>
+</html>
+

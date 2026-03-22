@@ -1,0 +1,32 @@
+{
+  "auto_mapping": {
+    "base_model_class": "SD3Transformer2DModel",
+    "parent_library": "diffusers.models.transformers.transformer_sd3"
+  },
+  "base_model_name_or_path": null,
+  "bias": "none",
+  "block_share": false,
+  "coft": false,
+  "eps": 6e-05,
+  "exclude_modules": null,
+  "fan_in_fan_out": false,
+  "inference_mode": true,
+  "init_weights": true,
+  "layers_pattern": null,
+  "layers_to_transform": null,
+  "module_dropout": 0.02,
+  "modules_to_save": null,
+  "num_cayley_neumann_terms": 5,
+  "oft_block_size": 16,
+  "peft_type": "OFT",
+  "r": 0,
+  "revision": null,
+  "target_modules": [
+    "to_out.0",
+    "to_q",
+    "to_k",
+    "to_v"
+  ],
+  "task_type": null,
+  "use_cayley_neumann": true
+}
